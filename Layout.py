@@ -25,7 +25,7 @@ st.markdown("""<style>[data-testid="stHeader"] {background: rgba(0,0,0,0);height
 
 ####################################################################################################
 # dataframes
-schedule = pd.read_csv(r'case3/schedule_airport.csv')
+schedule = pd.read_csv(r'case3\schedule_airport.csv')
 vlucht_1 = pd.read_excel(r'case3\30Flight 1.xlsx')
 runways_geo = pd.read_csv(r'Zurich\zurich_runway.csv')
 gates_geo = pd.read_csv(r'Zurich\zurich_gates84.csv')
@@ -136,3 +136,4 @@ with b2:
     st.success(f'Totaal aantal vluchten: {aantal_vluchten}')
 
     st.success(f'Gemiddelde vertraging (in minuten): {gem_vertraging}')
+
