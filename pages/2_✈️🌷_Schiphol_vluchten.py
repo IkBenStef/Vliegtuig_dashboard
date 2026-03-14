@@ -127,4 +127,4 @@ with b2:
         st.text('nog meer info')
         st.text('nog meer info')
 
-with st.expander('ruew vluchtdata'): st.dataframe(vlucht)
+with st.expander('ruwe vluchtdata'): st.dataframe(vlucht)
