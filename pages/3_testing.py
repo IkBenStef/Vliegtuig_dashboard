@@ -3,7 +3,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
-import geopandas as gpd
 import base64
 
 # Terminal: python -m streamlit run Dasboard_Vluchten.py
