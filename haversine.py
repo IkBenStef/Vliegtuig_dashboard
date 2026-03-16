@@ -1,4 +1,5 @@
 def haversine(lat1, lon1, lat2, lon2):
+    import numpy as np
     lat1 = np.radians(lat1)
     lat2 = np.radians(lat2)
     lon1 = np.radians(lon1)
