@@ -153,18 +153,17 @@ map_landingsbaan_data.add_trace(go.Scattermap(
 ))
 map_landingsbaan_data.update_layout(margin={"r":0,"t":25,"l":0,"b":0},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
 
-map_gate_data = px.scatter_map(
-    gate_count,
-    lon='lon',
-    lat='lat',
-    color='aantal_vluchten',
-    color_continuous_scale=[blue, red], 
-    hover_data={'lon': False, 'lat': False, 'aantal_vluchten': True, 'gate': True},
-    zoom=13,
-    title='Vluchtdata van Zurich Airport',
-    size='aantal_vluchten',
-    size_max=20,
-    opacity=0.9
+map_gate_data = px.scatter_map(gate_count,
+                               lon='lon',
+                               lat='lat',
+                               color='aantal_vluchten',
+                               color_continuous_scale=[blue, red], 
+                               hover_data={'lon': False, 'lat': False, 'aantal_vluchten': True, 'gate': True},
+                               zoom=13,
+                               title='Vluchtdata van Zurich Airport',
+                               size='aantal_vluchten',
+                               size_max=20,
+                               opacity=0.9
 )
 map_gate_data.update_layout(margin={"r":0,"t":25,"l":0,"b":0},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
 
@@ -173,7 +172,7 @@ vertraging = px.histogram(
     data_frame=schedule,
     x='vertraging_min',
     range_x=[0, q99],
-    title='Aantal vertragingen per minuut'
+    title='Frequentie van vertragingen'
 )
 vertraging.update_traces(
     xbins=dict(
@@ -185,71 +184,75 @@ vertraging.update_traces(
 )
 vertraging.update_layout(font=dict(size=18), margin={"r":0,"t":25,"l":0,"b":25},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
 
+afstand = px.histogram(
+    data_frame=schedule,
+    x='afstand_meters_haver',
+    title='Frequentie vluchtafstand',
+    nbins=100
+)
+afstand.update_layout(font=dict(size=18), margin={"r":0,"t":25,"l":0,"b":25},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
+
 fig_vliegvelden = px.scatter_map(groep_vluchten,
-                             lat='Latitude',
-                             lon='Longitude',
-                             color='LSV',
-                             color_discrete_map={'inkomend':red, 'uitgaand':blue},
-                             size='aantal',
-                             size_max=20,
-                             opacity=0.5,
-                             zoom=1,
-                             hover_data={'Latitude': False, 'Longitude': False,  'aantal': True, 'Name': True},
-                             )
+                                 lat='Latitude',
+                                 lon='Longitude',
+                                 color='LSV',
+                                 color_discrete_map={'inkomend':red, 'uitgaand':blue},
+                                 size='aantal',
+                                 size_max=20,
+                                 opacity=0.5,
+                                 zoom=1,
+                                 hover_data={'Latitude': False, 'Longitude': False,  'aantal': True, 'Name': True},
+                                 )
 fig_vliegvelden.update_layout(margin={"r":0,"t":25,"l":0,"b":25},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
 
-map_gate_vertraging = px.scatter_map(
-    groep_gate_vertraging,
-    lon='lon',
-    lat='lat',
-    color='gemiddelde_vertraging',
-    color_continuous_scale=[blue, red], 
-    hover_data={'lon': False, 'lat': False, 'gemiddelde_vertraging': True, 'gate': True},
-    zoom=13,
-    title='Gemiddelde vertraging per gate in minuten',
-    size='gemiddelde_vertraging',
-    size_max=20,
-    opacity=0.9
+map_gate_vertraging = px.scatter_map(groep_gate_vertraging,
+                                     lon='lon',
+                                     lat='lat',
+                                     color='gemiddelde_vertraging',
+                                     color_continuous_scale=[blue, red], 
+                                     hover_data={'lon': False, 'lat': False, 'gemiddelde_vertraging': True, 'gate': True},
+                                     zoom=13,
+                                     title='Gemiddelde vertraging per gate in minuten',
+                                     size='gemiddelde_vertraging',
+                                     size_max=20,
+                                     opacity=0.9
 )
 map_gate_vertraging.update_layout(margin={"r":0,"t":25,"l":0,"b":0},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
 
-fig_groep_vluchten_vertraagd = px.scatter_map(
-    groep_vluchten_vertraagd,
-    lon='Longitude',
-    lat='Latitude',
-    color='gemiddelde_vertraging',
-    color_continuous_scale=[blue, red], 
-    hover_data={'Longitude': False, 'Latitude': False, 'gemiddelde_vertraging': True, 'Name': True},
-    zoom=1,
-    title='Gemiddelde vertraging per vliegveld in minuten',
-    size='gemiddelde_vertraging',
-    size_max=20,
-    opacity=0.9
+fig_groep_vluchten_vertraagd = px.scatter_map(groep_vluchten_vertraagd,
+                                              lon='Longitude',
+                                              lat='Latitude',
+                                              color='gemiddelde_vertraging',
+                                              color_continuous_scale=[blue, red], 
+                                              hover_data={'Longitude': False, 'Latitude': False, 'gemiddelde_vertraging': True, 'Name': True},
+                                              zoom=1,
+                                              title='Gemiddelde vertraging per vliegveld in minuten',
+                                              size='gemiddelde_vertraging',
+                                              size_max=20,
+                                              opacity=0.9
 )
 fig_groep_vluchten_vertraagd.update_layout(margin={"r":0,"t":25,"l":0,"b":0},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
 
-fig_Sunburst = px.sunburst(
-    groep_vertraging, 
-    path=['LSV', 'gate_label', 'vertraagd_label'], 
-    values='aantal',
-    title="Analyse Vertragingen en Gate-wijzigingen",
-    color='vertraagd_label',
-    color_discrete_map={'Vertraagd': red, 'Op tijd': green},
-    color_discrete_sequence=[blue],
-    hover_data={'aantal': True}
+fig_Sunburst = px.sunburst(groep_vertraging, 
+                           path=['LSV', 'gate_label', 'vertraagd_label'], 
+                           values='aantal',
+                           title="Analyse Vertragingen en Gate-wijzigingen",
+                           color='vertraagd_label',
+                           color_discrete_map={'Vertraagd': red, 'Op tijd': green},
+                           color_discrete_sequence=[blue],
+                           hover_data={'aantal': True}
 )
 fig_Sunburst.update_traces(textinfo="label+percent parent")
 fig_Sunburst.update_layout(font=dict(size=18), margin={"r":0,"t":25,"l":0,"b":25},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
 
-fig_runwaynumber_count = px.bar(
-    runwaynumber_count, 
-    x='number', 
-    y='aantal_vluchten', 
-    color='LSV',
-    color_discrete_sequence=[blue, red],
-    barmode='group',
-    title="Landingsbaan aantallen (in LOG)",
-    log_y=True,
+fig_runwaynumber_count = px.bar(runwaynumber_count, 
+                                x='number', 
+                                y='aantal_vluchten', 
+                                color='LSV',
+                                color_discrete_sequence=[blue, red],
+                                barmode='group',
+                                title="Landingsbaan aantallen (in LOG)",
+                                log_y=True,
 )
 fig_runwaynumber_count.update_xaxes(type='category', title_text='')
 fig_runwaynumber_count.update_layout(
@@ -289,7 +292,7 @@ with a1:
     st.plotly_chart(vertraging, key=1, height=300)
 
 with a2:
-     st.plotly_chart(fig_Sunburst, key=2, height=300)
+     st.plotly_chart(afstand, key=2, height=300)
 
 with a3:
      st.plotly_chart(fig_runwaynumber_count, key=3, height=300)
@@ -311,3 +314,4 @@ with b2:
 
 st.divider()
 st.title('Zurich Airport vertraging analyse')
+st.plotly_chart(fig_Sunburst)
