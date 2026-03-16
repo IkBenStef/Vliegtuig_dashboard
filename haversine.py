@@ -1,4 +1,8 @@
 def haversine(lat1, lon1, lat2, lon2):
+    """
+    Bereken de grootcirkelafstand tussen twee punten 
+    op de aarde (gemiddelde afwijking: 395m)
+    """
     import numpy as np
     lat1 = np.radians(lat1)
     lat2 = np.radians(lat2)
