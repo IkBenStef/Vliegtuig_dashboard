@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
 import base64
+from haversine import haversine
 
 # Terminal: python -m streamlit run Layout.py
 
@@ -47,16 +48,32 @@ vertragin = schedule['ATA_ATD_ltc'] - schedule['STA_STD_ltc']
 vervroeging = schedule['STA_STD_ltc'] - schedule['ATA_ATD_ltc']
 schedule['vertraging_sec'] = vertragin.dt.total_seconds()
 schedule['vertraging_min'] = vertragin.dt.total_seconds() / 60
-schedule['vertraging_uur'] = vertragin.dt.total_seconds() / 3600
 schedule['vervroeging_sec'] = vervroeging.dt.total_seconds()
 schedule['vervroeging_min'] = vervroeging.dt.total_seconds() / 60
-schedule['vervroeging_uur'] = vervroeging.dt.total_seconds() / 3600
 schedule['vertraging_sec'] = schedule['vertraging_sec'].mask(schedule['vertraging_sec'] < 0)
 schedule['vertraging_min'] = schedule['vertraging_min'].mask(schedule['vertraging_min'] < 0)
-schedule['vertraging_uur'] = schedule['vertraging_uur'].mask(schedule['vertraging_uur'] < 0)
 schedule['vervroeging_sec'] = schedule['vervroeging_sec'].mask(schedule['vervroeging_sec'] < 0)
 schedule['vervroeging_min'] = schedule['vervroeging_min'].mask(schedule['vervroeging_min'] < 0)
-schedule['vervroeging_uur'] = schedule['vervroeging_uur'].mask(schedule['vervroeging_uur'] < 0)
+
+
+schedule = pd.merge(schedule, airports, how='left' ,left_on='afkomst', right_on='ICAO')
+schedule = pd.merge(schedule, airports, how='left' ,left_on='bestemming', right_on='ICAO')
+schedule = schedule.drop(columns=['ICAO_x','ICAO_y'])
+schedule = schedule.rename(columns={'Latitude_x':'lat_afkomst',
+                                    'Longitude_x':'lon_afkomst',
+                                    'Name_x':'naam_afkomst',
+                                    'Country_x':'land_afkomst',
+                                    'Latitude_y':'lat_bestemming',
+                                    'Longitude_y':'lon_bestemming',
+                                    'Name_y':'naam_bestemming',
+                                    'Country_y':'land_bestemming',})
+
+schedule['afstand_meters_haver'] = haversine(
+    schedule['lat_afkomst'],
+    schedule['lon_afkomst'],
+    schedule['lat_bestemming'],
+    schedule['lon_bestemming']
+).round()
 
 groep_runway = schedule.groupby(['LSV','RWY'])['RWY'].count().reset_index(name='aantal_vluchten')
 groep_runway = groep_runway.rename(columns={'RWY': 'number'})
@@ -71,6 +88,9 @@ groep_vluchten = pd.merge(groep_vluchten, airports, left_on='Org/Des', right_on=
 
 aantal_vluchten = schedule['FLT'].count()
 gem_vertraging = schedule['vertraging_min'].mean().round(2)
+max_vertraging = schedule['vertraging_min'].max().round(2)
+aantal_vertragingen = schedule['vertraging_min'].count()
+aantal_vertragingen_prc = (aantal_vertragingen / aantal_vluchten * 100).round(1)
 gem_vervroeging = schedule['vervroeging_min'].mean().round(2)
 
 dag_gemiddelde_vluchten = schedule.groupby('STD')['FLT'].count().reset_index(name='aantal')
@@ -80,10 +100,10 @@ groep_vertraging = schedule.groupby(['LSV', 'andere_gate', 'vertraagd'])['vertra
 groep_vertraging['vertraagd_label'] = groep_vertraging['vertraagd'].map({True: 'Vertraagd', False: 'Op tijd'})
 groep_vertraging['gate_label'] = groep_vertraging['andere_gate'].map({True: 'Andere Gate', False: 'Zelfde Gate'})
 
-groep_gate_vertraging = schedule.groupby('GAT')['vertraging_min'].sum().reset_index(name='totale_vertraging').round().drop(axis=1, index=0)
+groep_gate_vertraging = schedule.groupby('GAT')['vertraging_min'].mean().reset_index(name='gemiddelde_vertraging').round().drop(axis=1, index=0)
 groep_gate_vertraging = pd.merge(groep_gate_vertraging, gates_geo, left_on='GAT', right_on='gate').drop(axis=0, columns='GAT')
 
-groep_vluchten_vertraagd = schedule.groupby(['LSV','Org/Des'])['vertraging_min'].sum().round().reset_index(name='totale_vertraging')
+groep_vluchten_vertraagd = schedule.groupby(['LSV','Org/Des'])['vertraging_min'].mean().round().reset_index(name='gemiddelde_vertraging').fillna(1)
 groep_vluchten_vertraagd = pd.merge(groep_vluchten_vertraagd, airports, left_on='Org/Des', right_on='ICAO')
 groep_vluchten_vertraagd = groep_vluchten_vertraagd[groep_vluchten_vertraagd['LSV'] == 'inkomend']
 ####################################################################################################
@@ -169,7 +189,7 @@ fig_vliegvelden = px.scatter_map(groep_vluchten,
                              lat='Latitude',
                              lon='Longitude',
                              color='LSV',
-                             color_discrete_map={'inkomend':blue, 'uitgaand':red},
+                             color_discrete_map={'inkomend':red, 'uitgaand':blue},
                              size='aantal',
                              size_max=20,
                              opacity=0.5,
@@ -182,12 +202,12 @@ map_gate_vertraging = px.scatter_map(
     groep_gate_vertraging,
     lon='lon',
     lat='lat',
-    color='totale_vertraging',
+    color='gemiddelde_vertraging',
     color_continuous_scale=[blue, red], 
-    hover_data={'lon': False, 'lat': False, 'totale_vertraging': True, 'gate': True},
+    hover_data={'lon': False, 'lat': False, 'gemiddelde_vertraging': True, 'gate': True},
     zoom=13,
-    title='Totale vertraging per gate in minuten',
-    size='totale_vertraging',
+    title='Gemiddelde vertraging per gate in minuten',
+    size='gemiddelde_vertraging',
     size_max=20,
     opacity=0.9
 )
@@ -197,12 +217,12 @@ fig_groep_vluchten_vertraagd = px.scatter_map(
     groep_vluchten_vertraagd,
     lon='Longitude',
     lat='Latitude',
-    color='totale_vertraging',
+    color='gemiddelde_vertraging',
     color_continuous_scale=[blue, red], 
-    hover_data={'Longitude': False, 'Latitude': False, 'totale_vertraging': True, 'Name': True},
+    hover_data={'Longitude': False, 'Latitude': False, 'gemiddelde_vertraging': True, 'Name': True},
     zoom=1,
-    title='Totale vertraging per vliegveld in minuten',
-    size='totale_vertraging',
+    title='Gemiddelde vertraging per vliegveld in minuten',
+    size='gemiddelde_vertraging',
     size_max=20,
     opacity=0.9
 )
@@ -226,7 +246,7 @@ fig_runwaynumber_count = px.bar(
     x='number', 
     y='aantal_vluchten', 
     color='LSV',
-    color_discrete_sequence=[red, blue],
+    color_discrete_sequence=[blue, red],
     barmode='group',
     title="Landingsbaan aantallen (in LOG)",
     log_y=True,
@@ -250,21 +270,21 @@ fig_runwaynumber_count.update_layout(
 ####################################################################################################
 # Streamlit
 st.sidebar.title('Settings')
-st.title('Zurich Airport')
+st.title('Zurich Airport informatie')
 st.set_page_config(layout='wide', page_title='Layout')
 
 kaart_opties = {
     'Aantal per landingsbaan': map_landingsbaan_data,
     'Vluchten per vliegveld' : fig_vliegvelden,
-    'Totale vertraging per vliegveld' : fig_groep_vluchten_vertraagd,
-    'Aantal per gate': map_gate_data,
+    'Gemiddelde vertraging per vliegveld' : fig_groep_vluchten_vertraagd,
+    'Aantal vluchten per gate': map_gate_data,
     'Totale vertraging per Gate' : map_gate_vertraging,
 }
 gekozen_label = st.sidebar.selectbox('kies data voor kaart', list(kaart_opties.keys()))
 gekozen_kaart_string = kaart_opties[gekozen_label]
 
 # a zijn de grafieken
-a1, a2, a3, a4 = st.columns(4)
+a1, a2, a3 = st.columns(3)
 with a1: 
     st.plotly_chart(vertraging, key=1, height=300)
 
@@ -273,9 +293,6 @@ with a2:
 
 with a3:
      st.plotly_chart(fig_runwaynumber_count, key=3, height=300)
-
-with a4:
-     st.plotly_chart(fig, key=4, height=300)
 
 # B is de kaart links en rechts wat waardes
 b1, b2 = st.columns([5,1])
@@ -286,8 +303,11 @@ with b1:
 with b2:
     with st.expander('Info 📊', expanded=True): 
         st.text(f'Totaal aantal vluchten: {aantal_vluchten}')
-        st.text(f'Gemiddelde vertraging (t: min): {gem_vertraging}')
-        st.text(f'Gemiddelde vervroeging (t: min): {gem_vervroeging}')
+        st.text(f'Aantal vertragingen: {aantal_vertragingen} ({aantal_vertragingen_prc}%)')
+        st.text(f'Gemiddelde vertraging: {gem_vertraging} min')
+        st.text(f'Maximale vertraging: {max_vertraging} min')
+        st.text(f'Gemiddelde vervroeging: {gem_vervroeging} min')
         st.text(f'Gemiddelde vluchten per dag: {dag_gemiddelde_vluchten}')
 
-        
+st.divider()
+st.title('Zurich Airport vertraging analyse')

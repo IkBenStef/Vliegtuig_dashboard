@@ -4,10 +4,9 @@ import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
 import base64
+from haversine import haversine
 
 # Terminal: python -m streamlit run Dasboard_Vluchten.py
-
-
 
 ####################################################################################################
 # CSS om de achtergrond en sidebar mooi te maken
@@ -32,7 +31,10 @@ blue = "#5762d9"
 schedule = pd.read_csv(r'case3/schedule_airport.csv')
 runways_geo = pd.read_csv(r'Zurich/Zurich_runway.csv')
 gates_geo = pd.read_csv(r'Zurich/Zurich_gates.csv')
-airports = pd.read_csv(r'airports-extended-clean.csv', sep=';', decimal=',')
+all_stations = pd.read_csv(r'airports-extended-clean.csv', sep=';', decimal=',')
+
+airports = all_stations[all_stations['Type'] == 'airport']
+airports = airports[['ICAO','Latitude','Longitude', 'Name', 'Country']]
 
 schedule['LSV'] = np.where(schedule['LSV'] == 'S', 'uitgaand', 'inkomend')
 schedule['afkomst'] = np.where(schedule['LSV'] == 'inkomend', schedule['Org/Des'], 'LSZH')
@@ -56,8 +58,24 @@ schedule['vertraging_min'] = schedule['vertraging_min'].mask(schedule['vertragin
 schedule['vervroeging_sec'] = schedule['vervroeging_sec'].mask(schedule['vervroeging_sec'] < 0)
 schedule['vervroeging_min'] = schedule['vervroeging_min'].mask(schedule['vervroeging_min'] < 0)
 
-airports = airports[airports['Type'] == 'airport']
-airports = airports[['ICAO','Latitude','Longitude', 'Name', 'Country']]
+schedule = pd.merge(schedule, airports, how='left' ,left_on='afkomst', right_on='ICAO')
+schedule = pd.merge(schedule, airports, how='left' ,left_on='bestemming', right_on='ICAO')
+schedule = schedule.drop(columns=['ICAO_x','ICAO_y'])
+schedule = schedule.rename(columns={'Latitude_x':'lat_afkomst',
+                                    'Longitude_x':'lon_afkomst',
+                                    'Name_x':'naam_afkomst',
+                                    'Country_x':'land_afkomst',
+                                    'Latitude_y':'lat_bestemming',
+                                    'Longitude_y':'lon_bestemming',
+                                    'Name_y':'naam_bestemming',
+                                    'Country_y':'land_bestemming',})
+
+schedule['afstand_meters_haver'] = haversine(
+    schedule['lat_afkomst'],
+    schedule['lon_afkomst'],
+    schedule['lat_bestemming'],
+    schedule['lon_bestemming']
+).round()
 
 groep_runway = schedule.groupby(['LSV','RWY'])['RWY'].count().reset_index(name='aantal_vluchten')
 groep_runway = groep_runway.rename(columns={'RWY': 'number'})
@@ -75,10 +93,10 @@ dag_gemiddelde_vluchten = dag_gemiddelde_vluchten['aantal'].mean().astype(int)
 
 groep_vertraging = schedule.groupby(['LSV', 'andere_gate', 'vertraagd'])['vertraagd'].count().reset_index(name='aantal').sort_values('aantal')
 
-groep_gate_vertraging = schedule.groupby('GAT')['vertraging_min'].sum().reset_index(name='totale_vertraging').drop(axis=1, index=0)
+groep_gate_vertraging = schedule.groupby('GAT')['vertraging_min'].mean().reset_index(name='gemiddelde_vertraging').round().drop(axis=1, index=0)
 groep_gate_vertraging = pd.merge(groep_gate_vertraging, gates_geo, left_on='GAT', right_on='gate').drop(axis=0, columns='GAT')
 
-groep_vluchten_vertraagd = schedule.groupby(['LSV','Org/Des'])['vertraging_min'].sum().round().reset_index(name='totale_vertraging')
+groep_vluchten_vertraagd = schedule.groupby(['LSV','Org/Des'])['vertraging_min'].mean().round().reset_index(name='gemiddelde_vertraging').fillna(0)
 groep_vluchten_vertraagd = pd.merge(groep_vluchten_vertraagd, airports, left_on='Org/Des', right_on='ICAO')
 groep_vluchten_vertraagd = groep_vluchten_vertraagd[groep_vluchten_vertraagd['LSV'] == 'inkomend']
 
@@ -246,28 +264,21 @@ st.write(f"Tijd in daalfase: {descend_tijd/60:.1f} minuten")
 st.write(f"Totale tijd: {vlucht['Time (secs)'].iloc[-1]/60:.1f} minuten - {vlucht['Time (secs)'].iloc[-1]/60/60:.1f} uur")
 
 
-fig = px.scatter(groep_gate_vertraging,
-                 x='lon',
-                 y='lat',
-                 size='totale_vertraging',
-                 )
+
+
+
+corr_full = schedule.corr(numeric_only=True)
+corr_vertical = corr_full[['vertraagd']]
+corr_vertical = corr_vertical.drop(['vertraagd','vertraging_sec','vertraging_min','vervroeging_sec','vervroeging_min','lat_afkomst','lon_afkomst','lat_bestemming','lon_bestemming'], axis=0)
+corr_vertical = corr_vertical.sort_values(by='vertraagd', ascending=False)
+
+fig = px.imshow(corr_vertical, 
+                text_auto=True, 
+                color_continuous_scale=[blue,'white',red],
+                title="Correlatie met 'vertraagd'",
+                aspect="auto")
+fig.update_layout(font=dict(size=18), margin={"r":0,"t":25,"l":0,"b":25},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)') 
 st.plotly_chart(fig)
 
 
 
-st.dataframe(groep_vluchten)
-
-
-
-fig_airport = px.scatter_map(groep_vluchten,
-                             lat='Latitude',
-                             lon='Longitude',
-                             color='LSV',
-                             color_discrete_map={'inkomend':blue, 'uitgaand':red},
-                             size='aantal',
-                             size_max=20,
-                             opacity=0.5,
-                             zoom=1,
-                             hover_data={'Latitude': False, 'Longitude': False,  'aantal': True, 'Name': True},
-                             )
-st.plotly_chart(fig_airport)
