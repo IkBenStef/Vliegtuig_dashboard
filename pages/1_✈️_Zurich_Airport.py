@@ -92,6 +92,7 @@ max_vertraging = schedule['vertraging_min'].max().round(2)
 aantal_vertragingen = schedule['vertraging_min'].count()
 aantal_vertragingen_prc = (aantal_vertragingen / aantal_vluchten * 100).round(1)
 gem_vervroeging = schedule['vervroeging_min'].mean().round(2)
+gem_afstand = (schedule['afstand_meter_haver'].mean() / 1000).round(1)
 
 dag_gemiddelde_vluchten = schedule.groupby('STD')['FLT'].count().reset_index(name='aantal')
 dag_gemiddelde_vluchten = dag_gemiddelde_vluchten['aantal'].mean().astype(int)
@@ -309,7 +310,7 @@ with b2:
         st.text(f'Aantal vertragingen: {aantal_vertragingen} ({aantal_vertragingen_prc}%)')
         st.text(f'Gemiddelde vertraging: {gem_vertraging} min')
         st.text(f'Maximale vertraging: {max_vertraging} min')
-        st.text(f'Gemiddelde vervroeging: {gem_vervroeging} min')
+        st.text(f'Gemiddelde vlucht afstand: {gem_afstand} uur')
         st.text(f'Gemiddelde vluchten per dag: {dag_gemiddelde_vluchten}')
 
 st.divider()
