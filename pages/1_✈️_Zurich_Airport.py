@@ -281,7 +281,7 @@ kaart_opties = {
     'Vluchten per vliegveld' : fig_vliegvelden,
     'Gemiddelde vertraging per vliegveld' : fig_groep_vluchten_vertraagd,
     'Aantal vluchten per gate': map_gate_data,
-    'Totale vertraging per Gate' : map_gate_vertraging,
+    'Gemiddelde vertraging per Gate' : map_gate_vertraging,
 }
 gekozen_label = st.sidebar.selectbox('kies data voor kaart', list(kaart_opties.keys()))
 gekozen_kaart_string = kaart_opties[gekozen_label]
