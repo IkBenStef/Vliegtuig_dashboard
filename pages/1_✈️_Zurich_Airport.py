@@ -310,7 +310,7 @@ with b2:
         st.text(f'Aantal vertragingen: {aantal_vertragingen} ({aantal_vertragingen_prc}%)')
         st.text(f'Gemiddelde vertraging: {gem_vertraging} min')
         st.text(f'Maximale vertraging: {max_vertraging} min')
-        st.text(f'Gemiddelde vlucht afstand: {gem_afstand} uur')
+        st.text(f'Gemiddelde vlucht afstand: {gem_afstand} km')
         st.text(f'Gemiddelde vluchten per dag: {dag_gemiddelde_vluchten}')
 
 st.divider()
