@@ -31,7 +31,10 @@ green = "#00cc96"
 schedule = pd.read_csv(r'case3/schedule_airport.csv')
 runways_geo = pd.read_csv(r'Zurich/Zurich_runway.csv')
 gates_geo = pd.read_csv(r'Zurich/Zurich_gates.csv')
-airports = pd.read_csv(r'airports-extended-clean.csv', sep=';', decimal=',')
+all_stations = pd.read_csv(r'airports-extended-clean.csv', sep=';', decimal=',')
+
+airports = all_stations[all_stations['Type'] == 'airport']
+airports = airports[['ICAO','Latitude','Longitude', 'Name', 'Country']]
 
 schedule['LSV'] = np.where(schedule['LSV'] == 'S', 'uitgaand', 'inkomend')
 schedule['afkomst'] = np.where(schedule['LSV'] == 'inkomend', schedule['Org/Des'], 'LSZH')
