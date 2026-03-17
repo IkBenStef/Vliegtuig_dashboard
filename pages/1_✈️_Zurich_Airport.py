@@ -271,6 +271,19 @@ fig_runwaynumber_count.update_layout(
     )
 )
 
+corr_full = schedule.corr(numeric_only=True)
+corr_vertical = corr_full[['vertraagd']]
+corr_vertical = corr_vertical.drop(['vertraagd','vertraging_sec','vertraging_min','vervroeging_sec','vervroeging_min','lat_afkomst','lon_afkomst','lat_bestemming','lon_bestemming'], axis=0)
+corr_vertical = corr_vertical.sort_values(by='vertraagd', ascending=False)
+
+fig_corr = px.imshow(corr_vertical, 
+                text_auto=True, 
+                color_continuous_scale=[blue,'white',red],
+                title="Correlatie met 'vertraagd'",
+                aspect="auto")
+fig_corr.update_layout(font=dict(size=18), margin={"r":0,"t":25,"l":0,"b":25},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)') 
+
+
 ####################################################################################################
 # Streamlit
 st.sidebar.title('Settings')
@@ -316,3 +329,4 @@ with b2:
 st.divider()
 st.title('Zurich Airport vertraging analyse')
 st.plotly_chart(fig_Sunburst)
+st.plotly_chart(fig_corr)
