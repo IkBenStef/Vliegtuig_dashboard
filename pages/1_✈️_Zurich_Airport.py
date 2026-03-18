@@ -84,7 +84,7 @@ schedule['afstand_km'] = (haversine(
 #Datum Slider
 mindate = schedule['STD'].min().to_pydatetime()
 maxdate = schedule['STD'].max().to_pydatetime()
-
+st.sidebar.title('Settings')
 periode = st.sidebar.slider(
     label='Selecteer periode',
     min_value=mindate, 
@@ -306,7 +306,7 @@ fig_corolatie.update_layout(font=dict(size=18), margin={"r":0,"t":25,"l":0,"b":2
 
 ####################################################################################################
 # Streamlit
-st.sidebar.title('Settings')
+
 st.title('Zurich Airport informatie')
 st.set_page_config(layout='wide', page_title='Layout')
 
@@ -332,7 +332,7 @@ with a3:
      st.plotly_chart(fig_runwaynumber_count, key=3, height=300)
 
 # B is de kaart links en rechts wat waardes
-b1, b2 = st.columns([5,1])
+b1, b2 = st.columns([4,1])
 
 with b1:
     st.plotly_chart(gekozen_kaart_string, key=5, height=430)
