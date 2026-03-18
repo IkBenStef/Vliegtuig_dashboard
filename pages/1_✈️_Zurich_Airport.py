@@ -42,11 +42,11 @@ schedule['afkomst'] = np.where(schedule['LSV'] == 'inkomend', schedule['Org/Des'
 schedule['bestemming'] = np.where(schedule['LSV'] == 'uitgaand', schedule['Org/Des'], 'LSZH')
 schedule['andere_gate'] = schedule['TAR'] != schedule['GAT']
 
-combinedata = schedule['STD'].astype(str) + ' ' + schedule['ATA_ATD_ltc'].astype(str)
-combinedsta = schedule['STD'].astype(str) + ' ' + schedule['STA_STD_ltc'].astype(str)
-schedule['ATA_ATD_ltc'] = pd.to_datetime(combinedata, format='%d/%m/%Y %H:%M:%S')
-schedule['STA_STD_ltc'] = pd.to_datetime(combinedsta, format='%d/%m/%Y %H:%M:%S')
-schedule['vertraagd'] = (schedule['ATA_ATD_ltc'] - schedule['STA_STD_ltc']).astype(int) >= 0
+schedule['STD'] = pd.to_datetime(schedule['STD'], format='%d/%m/%Y')
+
+schedule['ATA_ATD_ltc'] = pd.to_datetime(schedule['STD'].dt.strftime('%Y-%m-%d') + ' ' + schedule['ATA_ATD_ltc'].astype(str))
+schedule['STA_STD_ltc'] = pd.to_datetime(schedule['STD'].dt.strftime('%Y-%m-%d') + ' ' + schedule['STA_STD_ltc'].astype(str))
+schedule['vertraagd'] = (schedule['ATA_ATD_ltc'] - schedule['STA_STD_ltc']).dt.total_seconds() >= 0
 
 vertragin = schedule['ATA_ATD_ltc'] - schedule['STA_STD_ltc']
 vervroeging = schedule['STA_STD_ltc'] - schedule['ATA_ATD_ltc']
@@ -80,7 +80,22 @@ schedule['afstand_km'] = (haversine(
     schedule['lat_bestemming'],
     schedule['lon_bestemming']
 ).round()) / 1000
+####################################################################################################
+#Datum Slider
+mindate = schedule['STD'].min().to_pydatetime()
+maxdate = schedule['STD'].max().to_pydatetime()
 
+periode = st.sidebar.slider(
+    label='Selecteer periode',
+    min_value=mindate, 
+    max_value=maxdate,
+    value=(mindate, maxdate)
+)
+schedule = schedule[
+    (schedule['STD'] >= periode[0]) & 
+    (schedule['STD'] <= periode[1])
+]
+####################################################################################################
 groep_runway = schedule.groupby(['LSV','RWY'])['RWY'].count().reset_index(name='aantal_vluchten')
 groep_runway = groep_runway.rename(columns={'RWY': 'number'})
 runwaynumber_count = pd.merge(groep_runway, runways_geo, on='number')
@@ -107,16 +122,14 @@ groep_vertraging = schedule.groupby(['LSV', 'andere_gate', 'vertraagd'])['vertra
 groep_vertraging['vertraagd_label'] = groep_vertraging['vertraagd'].map({True: 'Vertraagd', False: 'Op tijd'})
 groep_vertraging['gate_label'] = groep_vertraging['andere_gate'].map({True: 'Andere Gate', False: 'Zelfde Gate'})
 
-groep_gate_vertraging = schedule.groupby('GAT')['vertraging_min'].mean().reset_index(name='gemiddelde_vertraging').round().drop(axis=1, index=0)
+groep_gate_vertraging = schedule.groupby('GAT')['vertraging_min'].mean().reset_index(name='gemiddelde_vertraging').round().drop(axis=1, index=0).fillna(1)
 groep_gate_vertraging = pd.merge(groep_gate_vertraging, gates_geo, left_on='GAT', right_on='gate').drop(axis=0, columns='GAT')
 
 groep_vluchten_vertraagd = schedule.groupby(['LSV','Org/Des'])['vertraging_min'].mean().round().reset_index(name='gemiddelde_vertraging').fillna(1)
 groep_vluchten_vertraagd = pd.merge(groep_vluchten_vertraagd, airports, left_on='Org/Des', right_on='ICAO')
 groep_vluchten_vertraagd = groep_vluchten_vertraagd[groep_vluchten_vertraagd['LSV'] == 'inkomend']
+
 ####################################################################################################
-
-
-
 fig = px.line()
 fig.update_layout(paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
 
