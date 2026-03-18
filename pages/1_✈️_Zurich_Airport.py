@@ -293,7 +293,7 @@ fig_runwaynumber_count.update_layout(
 
 corolatie = schedule.corr(numeric_only=True)
 corolatie = corolatie[['vertraagd']]
-corolatie = corolatie.drop(['vertraagd','vertraging_sec','vertraging_min','vervroeging_sec','vervroeging_min','lat_afkomst','lon_afkomst','lat_bestemming','lon_bestemming'], axis=0)
+corolatie = corolatie.drop(['vertraagd','vertraging_sec','vertraging_min','vervroeging_sec','vervroeging_min','lat_afkomst','lon_afkomst','lat_bestemming','lon_bestemming','Vliegveld_hoogte_bestemming'], axis=0)
 corolatie = corolatie.sort_values(by='vertraagd', ascending=False)
 
 fig_corolatie = px.imshow(corolatie, 
