@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
 import base64
+import statsmodels.formula.api as smf
 from haversine import haversine
 
 # Terminal: python -m streamlit run Layout.py
@@ -34,7 +35,7 @@ gates_geo = pd.read_csv(r'Zurich/Zurich_gates.csv')
 all_stations = pd.read_csv(r'airports-extended-clean.csv', sep=';', decimal=',')
 
 airports = all_stations[all_stations['Type'] == 'airport']
-airports = airports[['ICAO','Latitude','Longitude', 'Name', 'Country']]
+airports = airports[['ICAO','Latitude','Longitude', 'Name', 'Country', 'Altitude']]
 
 schedule['LSV'] = np.where(schedule['LSV'] == 'S', 'uitgaand', 'inkomend')
 schedule['afkomst'] = np.where(schedule['LSV'] == 'inkomend', schedule['Org/Des'], 'LSZH')
@@ -69,14 +70,16 @@ schedule = schedule.rename(columns={'Latitude_x':'lat_afkomst',
                                     'Latitude_y':'lat_bestemming',
                                     'Longitude_y':'lon_bestemming',
                                     'Name_y':'naam_bestemming',
-                                    'Country_y':'land_bestemming',})
+                                    'Country_y':'land_bestemming',
+                                    'Altitude_x':'Vliegveld_hoogte_afkomst',
+                                    'Altitude_y':'Vliegveld_hoogte_bestemming',})
 
-schedule['afstand_meters_haver'] = haversine(
+schedule['afstand_km'] = (haversine(
     schedule['lat_afkomst'],
     schedule['lon_afkomst'],
     schedule['lat_bestemming'],
     schedule['lon_bestemming']
-).round()
+).round()) / 1000
 
 groep_runway = schedule.groupby(['LSV','RWY'])['RWY'].count().reset_index(name='aantal_vluchten')
 groep_runway = groep_runway.rename(columns={'RWY': 'number'})
@@ -95,7 +98,7 @@ max_vertraging = schedule['vertraging_min'].max().round(2)
 aantal_vertragingen = schedule['vertraging_min'].count()
 aantal_vertragingen_prc = (aantal_vertragingen / aantal_vluchten * 100).round(1)
 gem_vervroeging = schedule['vervroeging_min'].mean().round(2)
-gem_afstand = (schedule['afstand_meters_haver'].mean() / 1000).round(1)
+gem_afstand = schedule['afstand_km'].mean().round(1)
 
 dag_gemiddelde_vluchten = schedule.groupby('STD')['FLT'].count().reset_index(name='aantal')
 dag_gemiddelde_vluchten = dag_gemiddelde_vluchten['aantal'].mean().astype(int)
@@ -190,7 +193,7 @@ vertraging.update_layout(font=dict(size=18), margin={"r":0,"t":25,"l":0,"b":25},
 
 afstand = px.histogram(
     data_frame=schedule,
-    x='afstand_meters_haver',
+    x='afstand_km',
     title='Frequentie vluchtafstand',
     nbins=100
 )
@@ -257,6 +260,7 @@ fig_runwaynumber_count = px.bar(runwaynumber_count,
                                 barmode='group',
                                 title="Landingsbaan aantallen (in LOG)",
                                 log_y=True,
+                                labels={'aantal_vluchten': 'Aantal vluchten'},
 )
 fig_runwaynumber_count.update_xaxes(type='category', title_text='')
 fig_runwaynumber_count.update_layout(
@@ -274,17 +278,17 @@ fig_runwaynumber_count.update_layout(
     )
 )
 
-corr_full = schedule.corr(numeric_only=True)
-corr_vertical = corr_full[['vertraagd']]
-corr_vertical = corr_vertical.drop(['vertraagd','vertraging_sec','vertraging_min','vervroeging_sec','vervroeging_min','lat_afkomst','lon_afkomst','lat_bestemming','lon_bestemming'], axis=0)
-corr_vertical = corr_vertical.sort_values(by='vertraagd', ascending=False)
+corolatie = schedule.corr(numeric_only=True)
+corolatie = corolatie[['vertraagd']]
+corolatie = corolatie.drop(['vertraagd','vertraging_sec','vertraging_min','vervroeging_sec','vervroeging_min','lat_afkomst','lon_afkomst','lat_bestemming','lon_bestemming'], axis=0)
+corolatie = corolatie.sort_values(by='vertraagd', ascending=False)
 
-fig_corr = px.imshow(corr_vertical, 
+fig_corolatie = px.imshow(corolatie, 
                 text_auto=True, 
                 color_continuous_scale=[blue,'white',red],
                 title="Correlatie met 'vertraagd'",
                 aspect="auto")
-fig_corr.update_layout(font=dict(size=18), margin={"r":0,"t":25,"l":0,"b":25},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)') 
+fig_corolatie.update_layout(font=dict(size=18), margin={"r":0,"t":25,"l":0,"b":25},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)') 
 
 
 ####################################################################################################
@@ -294,7 +298,7 @@ st.title('Zurich Airport informatie')
 st.set_page_config(layout='wide', page_title='Layout')
 
 kaart_opties = {
-    'Aantal per landingsbaan': map_landingsbaan_data,
+    'Vluchten per landingsbaan': map_landingsbaan_data,
     'Vluchten per vliegveld' : fig_vliegvelden,
     'Gemiddelde vertraging per vliegveld' : fig_groep_vluchten_vertraagd,
     'Aantal vluchten per gate': map_gate_data,
@@ -326,10 +330,57 @@ with b2:
         st.text(f'Aantal vertragingen: {aantal_vertragingen} ({aantal_vertragingen_prc}%)')
         st.text(f'Gemiddelde vertraging: {gem_vertraging} min')
         st.text(f'Maximale vertraging: {max_vertraging} min')
-        st.text(f'Gemiddelde vlucht afstand: {gem_afstand} km')
+        st.text(f'Gemiddelde vluchtafstand: {gem_afstand} km')
         st.text(f'Gemiddelde vluchten per dag: {dag_gemiddelde_vluchten}')
 
 st.divider()
 st.title('Zurich Airport vertraging analyse')
-st.plotly_chart(fig_Sunburst)
-st.plotly_chart(fig_corr)
+
+
+c1, c2 = st.columns(2)
+with c1: st.plotly_chart(fig_Sunburst)
+with c2: st.plotly_chart(fig_corolatie)
+
+
+
+# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---
+# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---
+# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---
+# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---
+# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---
+st.header("Analyse: Afstand vs Vertraging")
+ 
+
+ 
+reg_data = schedule[['afstand_km', 'vertraging_min', 'RWY']].dropna()
+ 
+# Het model op basis van KM
+model = smf.ols(formula="vertraging_min ~ C(RWY)", data=reg_data)
+results = model.fit()
+
+# Visualisatie
+fig_reg = px.scatter(
+    reg_data,
+    x="RWY",
+    y="vertraging_min",
+    trendline="ols",
+    trendline_color_override=red,
+    title="Regressie: Invloed van afstand (km) op vertraging",
+    labels={'RWY': 'RWY ', 'vertraging_min': 'Vertraging (minuten)'},
+)
+fig_reg.update_layout(font=dict(size=18), margin={"r":0,"t":25,"l":0,"b":25},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')  
+st.plotly_chart(fig_reg, use_container_width=True)
+ 
+# Statistieken tonen
+c1, c2, c3 = st.columns(3)
+with c1:
+    st.metric("R-squared", f"{results.rsquared:.4f}")
+with c2:
+    # Coëfficiënt: hoeveel minuten vertraging komt erbij per km?
+    coef = results.params[1]
+    st.metric("Extra min/km", f"{coef:.6f}")
+with c3:
+    st.metric("P-waarde", f"{results.pvalues[1]:.4f}")
+ 
+with st.expander("Bekijk volledige Model Summary"):
+    st.code(results.summary())
