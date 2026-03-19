@@ -44,10 +44,7 @@ with st.expander('In dit dashboard zitten twee losse onderdelen:',expanded=True)
 
 
 with st.expander('', expanded=True):
-    a1, a2 = st.columns(2)
-    with a1: 
         st.header('Zurich Airport')
         st.image(zurich_img)
-    with a2: 
         st.header('Schiphol Airport')
         st.image(schiphol_img)
