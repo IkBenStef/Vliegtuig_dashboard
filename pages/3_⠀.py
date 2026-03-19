@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
 import base64
+import statsmodels.formula.api as smf
 from haversine import haversine
 
 # Terminal: python -m streamlit run Dasboard_Vluchten.py
@@ -26,7 +27,6 @@ st.markdown("""<style>[data-testid="stHeader"] {background: rgba(0,0,0,0);height
 red = "#db5656"
 blue = "#5762d9"
 ####################################################################################################
-
 # dataframes
 schedule = pd.read_csv(r'case3/schedule_airport.csv')
 runways_geo = pd.read_csv(r'Zurich/Zurich_runway.csv')
@@ -34,18 +34,19 @@ gates_geo = pd.read_csv(r'Zurich/Zurich_gates.csv')
 all_stations = pd.read_csv(r'airports-extended-clean.csv', sep=';', decimal=',')
 
 airports = all_stations[all_stations['Type'] == 'airport']
-airports = airports[['ICAO','Latitude','Longitude', 'Name', 'Country']]
+airports = airports[['ICAO','Latitude','Longitude', 'Name', 'Country', 'Altitude']]
+
 
 schedule['LSV'] = np.where(schedule['LSV'] == 'S', 'uitgaand', 'inkomend')
 schedule['afkomst'] = np.where(schedule['LSV'] == 'inkomend', schedule['Org/Des'], 'LSZH')
 schedule['bestemming'] = np.where(schedule['LSV'] == 'uitgaand', schedule['Org/Des'], 'LSZH')
 schedule['andere_gate'] = schedule['TAR'] != schedule['GAT']
 
-combinedata = schedule['STD'].astype(str) + ' ' + schedule['ATA_ATD_ltc'].astype(str)
-combinedsta = schedule['STD'].astype(str) + ' ' + schedule['STA_STD_ltc'].astype(str)
-schedule['ATA_ATD_ltc'] = pd.to_datetime(combinedata, format='%d/%m/%Y %H:%M:%S')
-schedule['STA_STD_ltc'] = pd.to_datetime(combinedsta, format='%d/%m/%Y %H:%M:%S')
-schedule['vertraagd'] = (schedule['ATA_ATD_ltc'] - schedule['STA_STD_ltc']).astype(int) >= 0
+schedule['STD'] = pd.to_datetime(schedule['STD'], format='%d/%m/%Y')
+
+schedule['ATA_ATD_ltc'] = pd.to_datetime(schedule['STD'].dt.strftime('%Y-%m-%d') + ' ' + schedule['ATA_ATD_ltc'].astype(str))
+schedule['STA_STD_ltc'] = pd.to_datetime(schedule['STD'].dt.strftime('%Y-%m-%d') + ' ' + schedule['STA_STD_ltc'].astype(str))
+schedule['vertraagd'] = (schedule['ATA_ATD_ltc'] - schedule['STA_STD_ltc']).dt.total_seconds() >= 0
 
 vertragin = schedule['ATA_ATD_ltc'] - schedule['STA_STD_ltc']
 vervroeging = schedule['STA_STD_ltc'] - schedule['ATA_ATD_ltc']
@@ -58,6 +59,7 @@ schedule['vertraging_min'] = schedule['vertraging_min'].mask(schedule['vertragin
 schedule['vervroeging_sec'] = schedule['vervroeging_sec'].mask(schedule['vervroeging_sec'] < 0)
 schedule['vervroeging_min'] = schedule['vervroeging_min'].mask(schedule['vervroeging_min'] < 0)
 
+
 schedule = pd.merge(schedule, airports, how='left' ,left_on='afkomst', right_on='ICAO')
 schedule = pd.merge(schedule, airports, how='left' ,left_on='bestemming', right_on='ICAO')
 schedule = schedule.drop(columns=['ICAO_x','ICAO_y'])
@@ -68,15 +70,32 @@ schedule = schedule.rename(columns={'Latitude_x':'lat_afkomst',
                                     'Latitude_y':'lat_bestemming',
                                     'Longitude_y':'lon_bestemming',
                                     'Name_y':'naam_bestemming',
-                                    'Country_y':'land_bestemming',})
+                                    'Country_y':'land_bestemming',
+                                    'Altitude_x':'Vliegveld_hoogte_afkomst',
+                                    'Altitude_y':'Vliegveld_hoogte_bestemming',})
 
-schedule['afstand_meters_haver'] = haversine(
+schedule['afstand_km'] = (haversine(
     schedule['lat_afkomst'],
     schedule['lon_afkomst'],
     schedule['lat_bestemming'],
     schedule['lon_bestemming']
-).round()
-
+).round()) / 1000
+####################################################################################################
+#Datum Slider
+mindate = schedule['STD'].min().to_pydatetime()
+maxdate = schedule['STD'].max().to_pydatetime()
+st.sidebar.title('Settings')
+periode = st.sidebar.slider(
+    label='Selecteer periode',
+    min_value=mindate, 
+    max_value=maxdate,
+    value=(mindate, maxdate)
+)
+schedule = schedule[
+    (schedule['STD'] >= periode[0]) & 
+    (schedule['STD'] <= periode[1])
+]
+####################################################################################################
 groep_runway = schedule.groupby(['LSV','RWY'])['RWY'].count().reset_index(name='aantal_vluchten')
 groep_runway = groep_runway.rename(columns={'RWY': 'number'})
 runwaynumber_count = pd.merge(groep_runway, runways_geo, on='number')
@@ -88,15 +107,25 @@ gate_count = groep_gate = pd.merge(groep_gate, gates_geo, on='gate')
 groep_vluchten = schedule.groupby(['LSV','Org/Des'])['Org/Des'].count().reset_index(name='aantal')
 groep_vluchten = pd.merge(groep_vluchten, airports, left_on='Org/Des', right_on='ICAO')
 
+aantal_vluchten = schedule['FLT'].count()
+gem_vertraging = schedule['vertraging_min'].mean().round(2)
+max_vertraging = schedule['vertraging_min'].max().round(2)
+aantal_vertragingen = schedule['vertraging_min'].count()
+aantal_vertragingen_prc = (aantal_vertragingen / aantal_vluchten * 100).round(1)
+gem_vervroeging = schedule['vervroeging_min'].mean().round(2)
+gem_afstand = schedule['afstand_km'].mean().round(1)
+
 dag_gemiddelde_vluchten = schedule.groupby('STD')['FLT'].count().reset_index(name='aantal')
 dag_gemiddelde_vluchten = dag_gemiddelde_vluchten['aantal'].mean().astype(int)
 
 groep_vertraging = schedule.groupby(['LSV', 'andere_gate', 'vertraagd'])['vertraagd'].count().reset_index(name='aantal').sort_values('aantal')
+groep_vertraging['vertraagd_label'] = groep_vertraging['vertraagd'].map({True: 'Vertraagd', False: 'Op tijd'})
+groep_vertraging['gate_label'] = groep_vertraging['andere_gate'].map({True: 'Andere Gate', False: 'Zelfde Gate'})
 
-groep_gate_vertraging = schedule.groupby('GAT')['vertraging_min'].mean().reset_index(name='gemiddelde_vertraging').round().drop(axis=1, index=0)
+groep_gate_vertraging = schedule.groupby('GAT')['vertraging_min'].mean().reset_index(name='gemiddelde_vertraging').round().drop(axis=1, index=0).fillna(1)
 groep_gate_vertraging = pd.merge(groep_gate_vertraging, gates_geo, left_on='GAT', right_on='gate').drop(axis=0, columns='GAT')
 
-groep_vluchten_vertraagd = schedule.groupby(['LSV','Org/Des'])['vertraging_min'].mean().round().reset_index(name='gemiddelde_vertraging').fillna(0)
+groep_vluchten_vertraagd = schedule.groupby(['LSV','Org/Des'])['vertraging_min'].mean().round().reset_index(name='gemiddelde_vertraging').fillna(1)
 groep_vluchten_vertraagd = pd.merge(groep_vluchten_vertraagd, airports, left_on='Org/Des', right_on='ICAO')
 groep_vluchten_vertraagd = groep_vluchten_vertraagd[groep_vluchten_vertraagd['LSV'] == 'inkomend']
 
@@ -279,6 +308,162 @@ fig = px.imshow(corr_vertical,
                 aspect="auto")
 fig.update_layout(font=dict(size=18), margin={"r":0,"t":25,"l":0,"b":25},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)') 
 st.plotly_chart(fig)
+####################################################################################################
+
+st.divider()
+st.title('Barplot met aantal vertragingen uitgesplitst per gate')
+
+groep_vertraging_rwy_prc = schedule.groupby(['vertraagd', 'RWY'])['RWY'].count().rename('aantal').reset_index()
+
+fig_vertraging_rwy = px.bar(
+    groep_vertraging_rwy_prc, 
+    x='RWY',
+    y='aantal',
+    color='vertraagd',
+    title='Percentage vertragingen per startbaan (RWY)',
+    barmode='relative',
+    color_discrete_sequence=[red, blue],
+)
+fig.update_xaxes(type='category', title_text='')
+fig.update_layout(barnorm='percent', yaxis_title='Percentage vertraging', xaxis_title='Startbaan (RWY)',
+                  font=dict(size=18), margin={"r":0,"t":50,"l":0,"b":50}, paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
+
+st.plotly_chart(fig_vertraging_rwy)
 
 
 
+
+
+
+
+####################################################################################################
+# Liniare regressie
+
+
+schedule['hour']    = schedule['STA_STD_ltc'].dt.hour
+schedule['weekday'] = schedule['STD'].dt.dayofweek
+schedule['month']   = schedule['STD'].dt.month
+ 
+#groepeer op route + uur
+route_df = schedule.groupby(
+    ['Org/Des', 'hour', 'weekday', 'RWC']
+).agg(
+    vertraging_min = ('vertraging_min', 'mean'),
+    afstand_km     = ('afstand_km', 'first'),
+    month          = ('month', 'first'),
+).reset_index().dropna()
+ 
+route_df = route_df[route_df['vertraging_min'] <= 60]
+route_df = route_df[route_df['vertraging_min'] >= -30]
+ 
+ 
+#smf.ols model
+formula = """vertraging_min ~ afstand_km
+                             + hour
+                             + weekday
+                             + month
+                             + C(RWC)
+                             + C(Q('Org/Des'))"""
+ 
+model = smf.ols(formula=formula, data=route_df).fit()
+
+
+ 
+#Coëfficiënten tabel
+
+hoofdvars = ['Intercept', 'afstand_km', 'hour', 'weekday', 'month']
+coef_df = pd.DataFrame({
+    'Variabele':   model.params.index,
+    'Coëfficiënt': model.params.values.round(4),
+    'p-waarde':    model.pvalues.values.round(4),
+}).reset_index(drop=True)
+coef_df['Sig.'] = coef_df['p-waarde'].apply(
+    lambda p: '***' if p<0.001 else ('**' if p<0.01 else ('*' if p<0.05 else '—'))
+)
+coef_hoofd = coef_df[coef_df['Variabele'].isin(hoofdvars)]
+
+ 
+#Scatter voorspeld vs werkelijk
+route_df['voorspeld'] = model.predict(route_df)
+fig_pred = px.scatter(
+    route_df,
+    x='vertraging_min',
+    y='voorspeld',
+    trendline='ols',
+    trendline_color_override=red,
+    labels={
+        'vertraging_min': 'Werkelijke vertraging (min)',
+        'voorspeld':      'Voorspelde vertraging (min)'
+    },
+    title='Voorspeld vs Werkelijk'
+)
+fig_pred.update_layout(paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)',font=dict(size=16))
+
+
+# Streamlit voor Liniare regressie
+st.divider()
+st.title('OLS Regressiemodel - Vliegtuigvertraging')
+
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.header("R²")
+    st.subheader(f"{model.rsquared:.4f}")
+with col2:
+    st.header("Adj. R²")
+    st.subheader(f"{model.rsquared_adj:.4f}")
+with col3:
+    st.header("F-stat")
+    st.subheader(f"{model.fvalue:,.4f}")
+with col4:
+    st.header("Obs.")
+    st.subheader(f"{int(model.nobs):,}")
+
+
+st.plotly_chart(fig_pred, use_container_width=True)
+st.subheader("Coëfficiënten (hoofdvariabelen)")
+st.dataframe(coef_hoofd, use_container_width=True)
+
+with st.expander("Volledige OLS samenvatting"):
+    st.code(str(model.summary()))
+ 
+st.divider()
+st.subheader("Waarom deze variabelen?")
+
+# Grafiek 1: Gemiddelde vertraging per uur
+vertraging_uur = schedule.groupby('hour')['vertraging_min'].mean().reset_index()
+fig_uur = px.bar(vertraging_uur, x='hour', y='vertraging_min',
+    title='Gemiddelde vertraging per uur van de dag',
+    labels={'hour': 'Uur', 'vertraging_min': 'Gem. vertraging (min)'},
+    color='vertraging_min', color_continuous_scale=[blue, red])
+fig_uur.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(size=16))
+st.plotly_chart(fig_uur, use_container_width=True)
+ 
+# Grafiek 2: Gemiddelde vertraging per dag van de week
+vertraging_dag = schedule.groupby('weekday')['vertraging_min'].mean().reset_index()
+vertraging_dag['dag'] = vertraging_dag['weekday'].map(
+    {0:'Ma',1:'Di',2:'Wo',3:'Do',4:'Vr',5:'Za',6:'Zo'})
+fig_dag = px.bar(vertraging_dag, x='dag', y='vertraging_min',
+    title='Gemiddelde vertraging per dag van de week',
+    labels={'dag': 'Dag', 'vertraging_min': 'Gem. vertraging (min)'},
+    color='vertraging_min', color_continuous_scale=[blue, red])
+fig_dag.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(size=16))
+st.plotly_chart(fig_dag, use_container_width=True)
+ 
+# Grafiek 3: Gemiddelde vertraging per RWC
+vertraging_rwc = schedule.groupby('RWC')['vertraging_min'].mean().reset_index().sort_values('vertraging_min', ascending=False)
+fig_rwc = px.bar(vertraging_rwc, x='RWC', y='vertraging_min',
+    title='Gemiddelde vertraging per baanconfiguratie (RWC)',
+    labels={'RWC': 'Baanconfiguratie', 'vertraging_min': 'Gem. vertraging (min)'},
+    color='vertraging_min', color_continuous_scale=[blue, red])
+fig_rwc.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(size=16))
+st.plotly_chart(fig_rwc, use_container_width=True)
+ 
+# Grafiek 4: Vertraging vs afstand scatter
+fig_afstand = px.scatter(
+    schedule.sample(5000, random_state=42),
+    x='afstand_km', y='vertraging_min',
+    trendline='ols', trendline_color_override=red,
+    title='Relatie tussen vluchtafstand en vertraging',
+    labels={'afstand_km': 'Afstand (km)', 'vertraging_min': 'Vertraging (min)'})
+fig_afstand.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(size=16))
+st.plotly_chart(fig_afstand, use_container_width=True)
