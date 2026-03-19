@@ -49,7 +49,7 @@ with st.expander('', expanded=True):
         st.header('Zurich Airport (Flughafen Kloten)')
     with a2:
         st.header('Inwoners Zurich: ~428.000')
-    b1, b2, b3 = st.columns(3, vertical_alignment="center")
+    b1, b2, b3 = st.columns(3)
     with b1:
         st.text('Aantal Gates: 97')
     with b2:
