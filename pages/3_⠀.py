@@ -133,7 +133,7 @@ groep_vluchten_vertraagd = groep_vluchten_vertraagd[groep_vluchten_vertraagd['LS
 
 
 st.set_page_config(page_title='Vluchten Dashboard', layout='wide')
-st.title('Vluchten van Schiphol')
+st.title('Testing')
 
 with st.expander('runway'): st.dataframe(runwaynumber_count)
 with st.expander('gate'): st.dataframe(gate_count)
