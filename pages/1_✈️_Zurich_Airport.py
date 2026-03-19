@@ -37,6 +37,7 @@ all_stations = pd.read_csv(r'airports-extended-clean.csv', sep=';', decimal=',')
 airports = all_stations[all_stations['Type'] == 'airport']
 airports = airports[['ICAO','Latitude','Longitude', 'Name', 'Country', 'Altitude']]
 
+schedule = schedule.drop(columns=['DL1','IX1','DL2','IX2','Identifier'])
 schedule['LSV'] = np.where(schedule['LSV'] == 'S', 'uitgaand', 'inkomend')
 schedule['afkomst'] = np.where(schedule['LSV'] == 'inkomend', schedule['Org/Des'], 'LSZH')
 schedule['bestemming'] = np.where(schedule['LSV'] == 'uitgaand', schedule['Org/Des'], 'LSZH')
@@ -47,6 +48,9 @@ schedule['STD'] = pd.to_datetime(schedule['STD'], format='%d/%m/%Y')
 schedule['ATA_ATD_ltc'] = pd.to_datetime(schedule['STD'].dt.strftime('%Y-%m-%d') + ' ' + schedule['ATA_ATD_ltc'].astype(str))
 schedule['STA_STD_ltc'] = pd.to_datetime(schedule['STD'].dt.strftime('%Y-%m-%d') + ' ' + schedule['STA_STD_ltc'].astype(str))
 schedule['vertraagd'] = (schedule['ATA_ATD_ltc'] - schedule['STA_STD_ltc']).dt.total_seconds() >= 0
+schedule['hour']    = schedule['STA_STD_ltc'].dt.hour
+schedule['weekday'] = schedule['STD'].dt.dayofweek
+schedule['month']   = schedule['STD'].dt.month
 
 vertragin = schedule['ATA_ATD_ltc'] - schedule['STA_STD_ltc']
 vervroeging = schedule['STA_STD_ltc'] - schedule['ATA_ATD_ltc']
@@ -129,6 +133,8 @@ groep_vluchten_vertraagd = schedule.groupby(['LSV','Org/Des'])['vertraging_min']
 groep_vluchten_vertraagd = pd.merge(groep_vluchten_vertraagd, airports, left_on='Org/Des', right_on='ICAO')
 groep_vluchten_vertraagd = groep_vluchten_vertraagd[groep_vluchten_vertraagd['LSV'] == 'inkomend']
 
+groep_vertraging_rwy_prc = schedule.groupby(['vertraagd', 'RWY'])['RWY'].count().rename('aantal').reset_index()
+
 ####################################################################################################
 fig = px.line()
 fig.update_layout(paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
@@ -171,7 +177,7 @@ map_landingsbaan_data.add_trace(go.Scattermap(
     hoverinfo='skip',
     name='landingsbaan nummers'
 ))
-map_landingsbaan_data.update_layout(margin={"r":0,"t":25,"l":0,"b":0},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
+map_landingsbaan_data.update_layout(font=dict(size=18), margin={"r":0,"t":25,"l":0,"b":0},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
 
 map_gate_data = px.scatter_map(gate_count,
                                lon='lon',
@@ -185,7 +191,7 @@ map_gate_data = px.scatter_map(gate_count,
                                size_max=20,
                                opacity=0.9
 )
-map_gate_data.update_layout(margin={"r":0,"t":25,"l":0,"b":0},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
+map_gate_data.update_layout(font=dict(size=18), margin={"r":0,"t":25,"l":0,"b":0},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
 
 q99 = schedule['vertraging_min'].quantile(0.99)
 vertraging = px.histogram(
@@ -223,7 +229,7 @@ fig_vliegvelden = px.scatter_map(groep_vluchten,
                                  zoom=1,
                                  hover_data={'Latitude': False, 'Longitude': False,  'aantal': True, 'Name': True},
                                  )
-fig_vliegvelden.update_layout(margin={"r":0,"t":25,"l":0,"b":25},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
+fig_vliegvelden.update_layout(font=dict(size=18), margin={"r":0,"t":25,"l":0,"b":25},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
 
 map_gate_vertraging = px.scatter_map(groep_gate_vertraging,
                                      lon='lon',
@@ -237,7 +243,7 @@ map_gate_vertraging = px.scatter_map(groep_gate_vertraging,
                                      size_max=20,
                                      opacity=0.9
 )
-map_gate_vertraging.update_layout(margin={"r":0,"t":25,"l":0,"b":0},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
+map_gate_vertraging.update_layout(font=dict(size=18), margin={"r":0,"t":25,"l":0,"b":0},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
 
 fig_groep_vluchten_vertraagd = px.scatter_map(groep_vluchten_vertraagd,
                                               lon='Longitude',
@@ -251,19 +257,18 @@ fig_groep_vluchten_vertraagd = px.scatter_map(groep_vluchten_vertraagd,
                                               size_max=20,
                                               opacity=0.9
 )
-fig_groep_vluchten_vertraagd.update_layout(margin={"r":0,"t":25,"l":0,"b":0},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
+fig_groep_vluchten_vertraagd.update_layout(font=dict(size=18), margin={"r":0,"t":25,"l":0,"b":0},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
 
 fig_Sunburst = px.sunburst(groep_vertraging, 
                            path=['LSV', 'gate_label', 'vertraagd_label'], 
                            values='aantal',
-                           title="Analyse Vertragingen en Gate-wijzigingen",
                            color='vertraagd_label',
                            color_discrete_map={'Vertraagd': red, 'Op tijd': green},
                            color_discrete_sequence=[blue],
                            hover_data={'aantal': True}
 )
 fig_Sunburst.update_traces(textinfo="label+percent parent")
-fig_Sunburst.update_layout(font=dict(size=18), margin={"r":0,"t":25,"l":0,"b":25},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
+fig_Sunburst.update_layout(font=dict(size=18), margin={"r":0,"t":0,"l":0,"b":25},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
 
 fig_runwaynumber_count = px.bar(runwaynumber_count, 
                                 x='number', 
@@ -276,11 +281,7 @@ fig_runwaynumber_count = px.bar(runwaynumber_count,
                                 labels={'aantal_vluchten': 'Aantal vluchten'},
 )
 fig_runwaynumber_count.update_xaxes(type='category', title_text='')
-fig_runwaynumber_count.update_layout(
-    font=dict(size=18), 
-    margin={"r":0,"t":50,"l":0,"b":50}, 
-    paper_bgcolor='rgba(0,0,0,0)',
-    plot_bgcolor='rgba(0,0,0,0)',
+fig_runwaynumber_count.update_layout(font=dict(size=18), margin={"r":0,"t":50,"l":0,"b":50}, paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)',
     legend=dict(
         orientation="h",
         yanchor="bottom",
@@ -299,10 +300,38 @@ corolatie = corolatie.sort_values(by='vertraagd', ascending=False)
 fig_corolatie = px.imshow(corolatie, 
                 text_auto=True, 
                 color_continuous_scale=[blue,'white',red],
-                title="Correlatie met 'vertraagd'",
-                aspect="auto")
-fig_corolatie.update_layout(font=dict(size=18), margin={"r":0,"t":25,"l":0,"b":25},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)') 
+                aspect="auto",
+                zmin=-1,
+                zmax=1)
+fig_corolatie.update_layout(font=dict(size=18), margin={"r":0,"t":0,"l":0,"b":25},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)') 
 
+fig_vertraging_rwy = px.bar(
+    groep_vertraging_rwy_prc, 
+    x='RWY',
+    y='aantal',
+    color='vertraagd',
+    barmode='relative',
+    color_discrete_sequence=[red, blue],
+)
+fig_vertraging_rwy.update_xaxes(type='category', title_text='')
+fig_vertraging_rwy.update_layout(barnorm='percent', yaxis_title='Percentage vertraging', xaxis_title='Startbaan (RWY)',
+                  font=dict(size=18), margin={"r":0,"t":0,"l":0,"b":50}, paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')
+
+vertraging_dag = schedule.groupby('weekday')['vertraging_min'].mean().reset_index()
+vertraging_dag['dag'] = vertraging_dag['weekday'].map(
+    {0:'Ma',1:'Di',2:'Wo',3:'Do',4:'Vr',5:'Za',6:'Zo'})
+fig_dag = px.bar(vertraging_dag, x='dag', y='vertraging_min',
+    title='Gemiddelde vertraging per dag van de week',
+    labels={'dag': 'Dag', 'vertraging_min': 'Gem. vertraging (min)'},
+    color='vertraging_min', color_continuous_scale=[blue, red])
+fig_dag.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(size=16))
+
+vertraging_uur = schedule.groupby('hour')['vertraging_min'].mean().reset_index()
+fig_uur = px.bar(vertraging_uur, x='hour', y='vertraging_min',
+    title='Gemiddelde vertraging per uur van de dag',
+    labels={'hour': 'Uur', 'vertraging_min': 'Gem. vertraging (min)'},
+    color='vertraging_min', color_continuous_scale=[blue, red])
+fig_uur.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(size=16))
 
 ####################################################################################################
 # Streamlit
@@ -323,19 +352,19 @@ gekozen_kaart_string = kaart_opties[gekozen_label]
 # a zijn de grafieken
 a1, a2, a3 = st.columns(3)
 with a1: 
-    st.plotly_chart(vertraging, key=1, height=300)
+    st.plotly_chart(vertraging, height=300)
 
 with a2:
-     st.plotly_chart(afstand, key=2, height=300)
+     st.plotly_chart(afstand, height=300)
 
 with a3:
-     st.plotly_chart(fig_runwaynumber_count, key=3, height=300)
+     st.plotly_chart(fig_runwaynumber_count, height=300)
 
 # B is de kaart links en rechts wat waardes
 b1, b2 = st.columns([4,1])
 
 with b1:
-    st.plotly_chart(gekozen_kaart_string, key=5, height=430)
+    st.plotly_chart(gekozen_kaart_string, height=430)
 
 with b2:
     with st.expander('Info 📊', expanded=True): 
@@ -350,50 +379,103 @@ st.divider()
 st.title('Zurich Airport vertraging analyse')
 
 
-c1, c2 = st.columns(2)
-with c1: st.plotly_chart(fig_Sunburst)
-with c2: st.plotly_chart(fig_corolatie)
+c1, c2, c3= st.columns(3)
+with c1: 
+    with st.expander('Vertragingen bij Gate-wijzigingen', expanded=True): st.plotly_chart(fig_Sunburst)
+with c2: 
+    with st.expander("Correlatie met 'vertraagd'", expanded=True): st.plotly_chart(fig_corolatie)
+with c3: 
+    with st.expander('Procent vertragingen per startbaan', expanded=True): st.plotly_chart(fig_vertraging_rwy)
 
+with st.expander('tijd analyse', expanded=True):
+    d1, d2 = st.columns(2)
+    with d1: st.plotly_chart(fig_uur, use_container_width=True)
+    with d2: st.plotly_chart(fig_dag, use_container_width=True)
 
-
-# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---
-# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---
-# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---
-# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---
-# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---# --- SIMPEL REGRESSIE MODEL (KM) ---
-st.header("Analyse: Afstand vs Vertraging")
+####################################################################################################
+####################################################################################################
+# Liniare regressie
  
+#groepeer op route + uur
+route_df = schedule.groupby(
+    ['Org/Des', 'hour', 'weekday', 'RWC']
+).agg(
+    vertraging_min = ('vertraging_min', 'mean'),
+    afstand_km     = ('afstand_km', 'first'),
+    month          = ('month', 'first'),
+).reset_index().dropna()
+ 
+route_df = route_df[route_df['vertraging_min'] <= 60]
+route_df = route_df[route_df['vertraging_min'] >= -30]
+ 
+ 
+#smf.ols model
+formula = """vertraging_min ~ afstand_km
+                             + hour
+                             + weekday
+                             + month
+                             + C(RWC)
+                             + C(Q('Org/Des'))"""
+ 
+model = smf.ols(formula=formula, data=route_df).fit()
+
 
  
-reg_data = schedule[['afstand_km', 'vertraging_min', 'RWY']].dropna()
- 
-# Het model op basis van KM
-model = smf.ols(formula="vertraging_min ~ C(RWY)", data=reg_data)
-results = model.fit()
+#Coëfficiënten tabel
 
-# Visualisatie
-fig_reg = px.scatter(
-    reg_data,
-    x="RWY",
-    y="vertraging_min",
-    trendline="ols",
-    trendline_color_override=red,
-    title="Regressie: Invloed van afstand (km) op vertraging",
-    labels={'RWY': 'RWY ', 'vertraging_min': 'Vertraging (minuten)'},
+hoofdvars = ['Intercept', 'afstand_km', 'hour', 'weekday', 'month']
+coef_df = pd.DataFrame({
+    'Variabele':   model.params.index,
+    'Coëfficiënt': model.params.values.round(4),
+    'p-waarde':    model.pvalues.values.round(4),
+}).reset_index(drop=True)
+coef_df['Sig.'] = coef_df['p-waarde'].apply(
+    lambda p: '***' if p<0.001 else ('**' if p<0.01 else ('*' if p<0.05 else '—'))
 )
-fig_reg.update_layout(font=dict(size=18), margin={"r":0,"t":25,"l":0,"b":25},paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)')  
-st.plotly_chart(fig_reg, use_container_width=True)
+coef_hoofd = coef_df[coef_df['Variabele'].isin(hoofdvars)]
+
  
-# Statistieken tonen
-c1, c2, c3 = st.columns(3)
-with c1:
-    st.metric("R-squared", f"{results.rsquared:.4f}")
-with c2:
-    # Coëfficiënt: hoeveel minuten vertraging komt erbij per km?
-    coef = results.params[1]
-    st.metric("Extra min/km", f"{coef:.6f}")
-with c3:
-    st.metric("P-waarde", f"{results.pvalues[1]:.4f}")
+#Scatter voorspeld vs werkelijk
+route_df['voorspeld'] = model.predict(route_df)
+fig_pred = px.scatter(
+    route_df,
+    x='vertraging_min',
+    y='voorspeld',
+    trendline='ols',
+    trendline_color_override=red,
+    labels={
+        'vertraging_min': 'Werkelijke vertraging (min)',
+        'voorspeld':      'Voorspelde vertraging (min)'
+    },
+    title='Voorspeld vs Werkelijk'
+)
+fig_pred.update_layout(paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)',font=dict(size=16))
+
+
+# Streamlit voor Liniare regressie
+st.divider()
+st.title('OLS Regressiemodel - Vliegtuigvertraging')
+
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.header("R²")
+    st.subheader(f"{model.rsquared:.4f}")
+with col2:
+    st.header("Adj. R²")
+    st.subheader(f"{model.rsquared_adj:.4f}")
+with col3:
+    st.header("F-stat")
+    st.subheader(f"{model.fvalue:,.4f}")
+with col4:
+    st.header("Obs.")
+    st.subheader(f"{int(model.nobs):,}")
+
+
+st.plotly_chart(fig_pred, use_container_width=True)
+st.subheader("Coëfficiënten (hoofdvariabelen)")
+st.dataframe(coef_hoofd, use_container_width=True)
+
+with st.expander("Volledige OLS samenvatting"):
+    st.code(str(model.summary()))
  
-with st.expander("Bekijk volledige Model Summary"):
-    st.code(results.summary())
+st.divider()
