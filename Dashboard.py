@@ -36,9 +36,9 @@ st.title('Dashboard over vlieg data ✈️')
 with st.expander('In dit dashboard zitten twee losse onderdelen:',expanded=True): 
     st.subheader('- Het vliegveld Zurich Airport')
     st.text('Met data over Zurich airport en een analyse in vluchtvertraging')
-    st.text('- Informatie')
-    st.text('- Analyse')
-    st.text('- OLS regressie')
+    st.text('* Informatie')
+    st.text('* Analyse')
+    st.text('* OLS regressie')
     st.text('')
     st.subheader('- Verschillende vluchten die zijn vertrokken van Schiphol')
 
