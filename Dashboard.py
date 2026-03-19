@@ -44,7 +44,18 @@ with st.expander('In dit dashboard zitten twee losse onderdelen:',expanded=True)
 
 
 with st.expander('', expanded=True):
-        st.header('Zurich Airport')
-        st.image(zurich_img)
-        st.header('Schiphol Airport')
-        st.image(schiphol_img)
+    a1, a2 = st.columns(2)
+    with a1:
+        st.header('Zurich Airport (Flughafen Kloten)')
+    with a2:
+        st.header('Inwoners Zurich: ~428.000')
+    b1, b2, b3 = st.columns(3)
+    with b1:
+        st.text('Aantal Gates: 97')
+    with b2:
+        st.text('Aantal landingsbanen: 3')
+    with b3:
+        st.text('Gebruikers: in 2025, 32.6 miljoen')
+    st.image(zurich_img)
+    st.header('Schiphol Airport')
+    st.image(schiphol_img)
