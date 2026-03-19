@@ -58,4 +58,5 @@ with st.expander('', expanded=True):
         st.text('Gebruikers: in 2025, 32.6 miljoen')
     st.image(zurich_img)
     st.header('Schiphol Airport')
+    st.text('Inwoners Amsterdam: ~942.500, Gebruikers: 2025, 68,8 miljoen')
     st.image(schiphol_img)
